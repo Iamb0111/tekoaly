@@ -78,7 +78,7 @@ canvas#map{display:block;width:100%;flex:1;cursor:pointer}
 .diff-btn.medium:hover h3{color:#f59e0b}
 .diff-btn.hard:hover{border-color:#ef4444;box-shadow:0 0 20px #ef444444}
 .diff-btn.hard:hover h3{color:#ef4444}
-#tut-overlay{position:absolute;inset:0;z-index:25;display:none;pointer-events:none}
+#tut-overlay{position:absolute;inset:0;z-index:50;display:none;pointer-events:none;background:rgba(0,0,0,0.5)}
 #tut-box{position:absolute;background:#1e293bee;border:2px solid #f59e0b;border-radius:12px;padding:18px 22px;max-width:400px;backdrop-filter:blur(6px);pointer-events:auto}
 #tut-box h3{color:#f59e0b;margin-bottom:4px;font-size:15px}
 #tut-box p{font-size:12px;line-height:1.5;color:#e2e8f0;margin-bottom:8px}
@@ -91,17 +91,18 @@ canvas#map{display:block;width:100%;flex:1;cursor:pointer}
   <div id="map-wrap">
     <canvas id="map"></canvas>
     <div id="help-bar"><span class="pb" id="h-badge">VAHVISTUS</span><span id="h-text"></span></div>
-    <div id="dice-modal"><h2>Taistelu</h2><div class="dice-row" id="dice-results"></div><div id="dice-msg"></div><button class="btn btn-p" id="dice-ok">OK</button></div>
-    <div id="overlay"><h1 id="go-text"></h1><p>Maailma on vallattu!</p><button class="btn btn-r" onclick="startNewGame()">Uusi peli</button><button class="btn btn-t" onclick="openTutorial()">Tutorial</button></div>
+    <div id="dice-modal"><h2>Taistelu!</h2><div class="dice-row" id="dice-results"></div><div id="dice-msg"></div><button class="btn btn-p" id="dice-ok">Jatka</button></div>
+    <div id="overlay"><h1 id="go-text"></h1><p>Kaikki alueet on vallattu!</p><button class="btn btn-r" onclick="startNewGame()">Uusi peli</button><button class="btn btn-t" onclick="openTutorial()">Ohjeet</button></div>
     <div id="start-overlay">
       <h1>Maailman Valloitus</h1>
       <p>Risk-tyylinen strategiapeli. Valloita kaikki alueet ja kukista vastustajat!</p>
       <p style="font-size:13px;color:#64748b">Valitse vaikeustaso:</p>
       <div class="diff-btns">
-        <div class="diff-btn easy" onclick="startGame('easy')"><h3>Helppo</h3><div class="dd">1 botti<br>+5 aloitusarmeijaa<br>50% enemmän vahvistuksia<br>Botit tekevät virheitä</div></div>
-        <div class="diff-btn medium" onclick="startGame('medium')"><h3>Keskitaso</h3><div class="dd">2 bottia<br>+2 aloitusarmeijaa<br>20% enemmän vahvistuksia<br>Botit kohtuullisia</div></div>
-        <div class="diff-btn hard" onclick="startGame('hard')"><h3>Vaikea</h3><div class="dd">3 bottia<br>Ei aloitusbonusta<br>Normaalit vahvistukset<br>Botit aggressiivisia</div></div>
+        <div class="diff-btn easy" onclick="startGame('easy')"><h3>Helppo</h3><div class="dd">1 botti<br>+5 aloitusarmeijaa<br>50 % enemmän vahvistuksia<br>Botit tekevät virheitä</div></div>
+        <div class="diff-btn medium" onclick="startGame('medium')"><h3>Keskitaso</h3><div class="dd">2 bottia<br>+2 aloitusarmeijaa<br>20 % enemmän vahvistuksia<br>Botit kohtuullisia</div></div>
+        <div class="diff-btn hard" onclick="startGame('hard')"><h3>Vaikea</h3><div class="dd">3 bottia<br>Ei aloitusbonusta<br>Tavalliset vahvistukset<br>Botit aggressiivisia</div></div>
       </div>
+      <button class="btn btn-t" onclick="startTut()" style="margin-top:12px;font-size:14px;padding:10px 24px">Lue ohjeet ensin</button>
     </div>
     <div id="tut-overlay"><div id="tut-box"><h3 id="tut-title"></h3><p id="tut-text"></p><div class="tut-nav"><button class="btn btn-s" id="tut-prev">Edellinen</button><button class="btn btn-p" id="tut-next">Seuraava</button></div></div></div>
   </div>
@@ -116,7 +117,7 @@ canvas#map{display:block;width:100%;flex:1;cursor:pointer}
     <div id="reinforce-info">Vahvistuksia: <span id="reinforce-count">0</span></div>
     <div id="players-panel"><h3>Pelaajat</h3><div id="players-list"></div></div>
     <div id="cont-panel"><h3>Mantereet</h3><div id="cont-list"></div></div>
-    <div id="log-panel"><h3>Loki</h3><div id="log-entries"></div></div>
+    <div id="log-panel"><h3>Taisteluloki</h3><div id="log-entries"></div></div>
     </div>
     <div id="actions"></div>
   </div>
@@ -255,11 +256,11 @@ class Game{
       const mv=Math.max(num,atk.armies-1);
       def.armies=Math.max(1,Math.min(mv,atk.armies-1));
       atk.armies-=def.armies;this.conq=true;
-      this._log(PL[atk.owner].name+" valloitti "+to+"!","conq");
+      this._log(PL[atk.owner].name+" valloitti alueen "+to+"!","conq");
       const ok=new Set(Object.values(this.t).map(t=>t.owner));
-      if(!ok.has(old)){this.alive.delete(old);this._log(PL[old].name+" eliminoitu!","elim")}
+      if(!ok.has(old)){this.alive.delete(old);this._log(PL[old].name+" eliminointi!","elim")}
     } else {
-      this._log(PL[atk.owner].name+": "+from+" → "+to+" (-"+al+", -"+dl+")","atk");
+      this._log(PL[atk.owner].name+": "+from+" → "+to+" (hyökkääjä -"+al+", puolustaja -"+dl+")","atk");
     }
     this.dr={ad,dd,al,dl,conq,from,to};return conq;
   }
@@ -630,11 +631,11 @@ function updateUI(){
   if(g.phase===0&&g.cur===0)ht.innerHTML='Klikkaa <span class="ph">sinisiä</span> alueita lisätäksesi joukkoja (jäljellä: <span class="ph">'+g.reinf+'</span>)';
   else if(g.phase===1&&g.cur===0){
     if(!g.sel)ht.innerHTML='1) Klikkaa <span class="ph">omaa aluetta</span> (väh. 2 armeijaa) → 2) Klikkaa <span class="pc">vihollisen naapurialuetta</span>';
-    else ht.innerHTML='Hyökkääjä: <span class="ph">'+g.sel+'</span> ('+g.t[g.sel].armies+'). Klikkaa <span class="pc">punaisella merkittyä</span> vihollista.';
+    else ht.innerHTML='Hyökkääjä: <span class="ph">'+g.sel+'</span> ('+g.t[g.sel].armies+' armeijaa). Klikkaa <span class="pc">punaisella merkittyä</span> vihollista.';
   }
   else if(g.phase===2&&g.cur===0){
-    if(!g.fs)ht.innerHTML='<span class="ph">LINNOITUS:</span> Siirrä armeijoita sisämaasta rajalle. Klikkaa <span class="ph">lähdettä</span> → <span class="pc">kohdealuetta</span>. Tai ohita.';
-    else ht.innerHTML='Lähde: <span class="ph">'+g.fs+'</span>. Klikkaa <span class="pc">vihreällä merkittyä</span> kohdetta. Tai ohita.';
+    if(!g.fs)ht.innerHTML='<span class="ph">LINNOITUS (vapaaehtoinen):</span> Siirrä armeijoita sisämaasta rajalle. Klikkaa <span class="ph">lähdealuetta</span> → <span class="pc">kohdealuetta</span>. Tai ohita.';
+    else ht.innerHTML='Lähdealue: <span class="ph">'+g.fs+'</span>. Klikkaa <span class="pc">vihreällä merkittyä</span> kohdealuetta. Tai ohita.';
   }
   else if(g.phase===3)ht.innerHTML='<span class="ph">'+PL[g.cur].name+'</span> pelaa...';
   else if(g.phase===4)ht.innerHTML='<span class="ph">Peli päättynyt!</span>';
@@ -670,7 +671,7 @@ function updateUI(){
     mkBtn(act,PL[g.cur].name+' pelaa...','btn-s',null,true);
   }else{
     if(g.phase===0){
-      mkBtn(act,'Hyökkäämään ▶','btn-a',()=>{g.phase=1;g.sel=null;g.tgt=null;updateUI()},g.reinf>0);
+      mkBtn(act,'Hyökkäysvaiheeseen ▶','btn-a',()=>{g.phase=1;g.sel=null;g.tgt=null;updateUI()},g.reinf>0);
       mkBtn(act,'Ohita vahvistus ▶▶','btn-s',()=>{g.reinf=0;g.phase=1;g.sel=null;updateUI()},g.reinf===0);
     }else if(g.phase===1){
       mkBtn(act,'Linnoitukseen ▶','btn-f',()=>{g.phase=2;g.sel=null;g.tgt=null;g.fs=null;updateUI()});
@@ -712,7 +713,7 @@ function showDice(r){
   document.getElementById('dice-results').innerHTML=
     '<div class="dice-side"><div class="dl">Hyökkääjä ('+r.from+')</div><div class="dd">'+r.ad.map((d,i)=>'<div class="die '+(i<r.dd.length&&d>r.dd[i]?'win':'lose')+'">'+d+'</div>').join('')+'</div></div>'+
     '<div class="dice-side"><div class="dl">Puolustaja ('+r.to+')</div><div class="dd">'+r.dd.map((d,i)=>'<div class="die '+(i<r.ad.length&&d>=r.ad[i]?'win':'lose')+'">'+d+'</div>').join('')+'</div></div>';
-  document.getElementById('dice-msg').textContent=r.conq?'Valloitettu! '+r.to+' on sinun!':'Hyökkäys -'+r.al+', puolustus -'+r.dl;
+  document.getElementById('dice-msg').textContent=r.conq?'Valloitettu! '+r.to+' on nyt sinun!':'Hyökkääjä menetti '+r.al+', puolustaja menetti '+r.dl;
   document.getElementById('dice-ok').onclick=()=>{dm.style.display='none';if(G.t[r.from]&&G.t[r.from].owner===G.cur&&G.t[r.from].armies>1)G.sel=r.from;else G.sel=null;G.tgt=null;updateUI()};
 }
 function startGame(diff){G=new Game(diff);soldiers=[];battleFx=[];document.getElementById('start-overlay').style.display='none';document.getElementById('dice-modal').style.display='none';updateUI()}
@@ -722,11 +723,11 @@ function openTutorial(){document.getElementById('overlay').style.display='none';
 // ===================== TUTORIAL =====================
 const TUT=[
   {t:"Tervetuloa!",p:"Tämä on Risk-tyylinen strategiapeli. Valloita kaikki 42 aluetta! Valitse vaikeustaso aluksi: Helppo = 1 botti, Keskitaso = 2, Vaikea = 3."},
-  {t:"Kartta",p:"6 maanosaa: P-Amerikka, E-Amerikka, Eurooppa, Afrikka, Aasia, Oseania. Alueilla näet pienen sotilasjoukon ja armeijoiden määrän."},
+  {t:"Kartta",p:"6 maanosaa: Pohjois-Amerikka, Etelä-Amerikka, Eurooppa, Afrikka, Aasia, Oseania. Alueilla näet pienen sotilasjoukon ja armeijoiden määrän."},
   {t:"Vahvistus",p:"Klikkaa omia (sinisiä) alueita lisätäksesi armeijoita. Saat vähintään 3 + 1/3 alueistasi. Mantereista tulee lisäbonuksia."},
-  {t:"Hyökkäys",p:"1) Klikkaa omaa aluetta (väh. 2 armeijaa) 2) Klikkaa viereistä vihollista. Nopat heitetään auto: hyökkääjä max 3, puolustaja max 2. Näet sotilaat juoksemassa!"},
-  {t:"Linnoitus",p:"Vapaaehtoinen: siirrä armeijoita yhdestä omasta alueesta viereiseen omaan. Esim. 8 sisämaasta → rajalle = 9 valmiina hyökkäämään. Usein ohitetaan."},
-  {t:"Vinkit",p:"Vahvista rajoja. Hallitse kokonaisia mantereita. Linnoituksella kerää voimaa. Peli päättyy kun yksi pelaaja jää! Paina T = tutorial, R = uusi peli."}
+  {t:"Hyökkäys",p:"1) Klikkaa omaa aluetta (väh. 2 armeijaa) 2) Klikkaa viereistä vihollista. Nopat heitetään automaattisesti: hyökkääjä max 3, puolustaja max 2. Näet sotilaiden juoksevan!"},
+  {t:"Linnoitus",p:"Vapaaehtoinen: siirrä armeijoita yhdestä omasta alueesta viereiseen omaan alueeseen. Esim. 8 sisämaasta → rajalle = 9 valmiina hyökkäämään. Usein ohitetaan."},
+  {t:"Vinkit",p:"Vahvista rajoja. Hallitse kokonaisia mantereita. Linnoituksella kerää voimaa. Peli päättyy kun vain yksi pelaaja on jäljellä! Paina T = tutorial, R = uusi peli."}
 ];
 let tutS=-1,tutA=false;
 function startTut(){tutA=true;tutS=0;document.getElementById('tut-overlay').style.display='block';showTutS()}

@@ -1,0 +1,1 @@
+{"player": {"x": 640.0, "y": 500, "level": 3, "xp": 0, "health": 105, "max_health": 150, "mana": 66, "max_mana": 66, "coins": 160, "keys": 1, "weapon": "sword", "abilities": {"double_jump": true, "dash": false, "magic_shield": false, "fireball": false, "wall_jump": false, "air_dash": false, "ground_slam": false, "whirlwind": false}}, "game_time": 5244, "score": 5414}

@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maailman Valloitus - Risk</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0e1a;color:#ddd;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden;height:100vh;user-select:none}
+#app{display:flex;height:100vh}
+#map-wrap{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
+canvas#map{display:block;width:100%;flex:1;cursor:pointer}
+#help-bar{background:#1e293b;padding:8px 18px;font-size:13px;color:#f1f5f9;border-top:2px solid #334155;min-height:40px;display:flex;align-items:center;gap:10px}
+#help-bar .pb{background:#334155;padding:2px 10px;border-radius:4px;font-weight:bold;font-size:12px;white-space:nowrap}
+.ph{color:#fbbf24;font-weight:bold}
+.pc{color:#60a5fa;font-weight:bold}
+#sidebar{width:330px;background:#111827;border-left:2px solid #1e293b;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+#top-info{padding:10px 14px;background:#1e293b;border-bottom:2px solid #334155}
+#top-info h1{font-size:18px;color:#fbbf24;margin-bottom:2px}
+#turn-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-top:3px}
+#phase-bar{display:flex;gap:8px;align-items:center;margin-top:5px}
+.pd{width:24px;height:5px;border-radius:3px;background:#334155;transition:all .2s}
+.pd.active{background:#fbbf24;box-shadow:0 0 8px #fbbf2488}
+.pd.done{background:#22c55e}
+#phase-label{font-size:13px;font-weight:bold;margin-left:auto}
+#scroll-area{flex:1;overflow-y:auto;min-height:0}
+#player-info{padding:8px 14px;border-bottom:1px solid #1e293b}
+#player-info .pn{font-size:15px;font-weight:bold}
+#diff-badge{font-size:11px;padding:2px 8px;border-radius:3px;margin-left:8px;font-weight:bold}
+#reinforce-info{padding:6px 14px;background:#1a2234;border-bottom:1px solid #1e293b;font-size:13px;display:none}
+#players-panel{padding:8px 14px;border-bottom:1px solid #1e293b}
+#players-panel h3,.ph3{font-size:11px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px}
+.pr{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px}
+.pr .dt{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.pr .st{margin-left:auto;color:#94a3b8;font-size:10px}
+.pr.dead{opacity:.3;text-decoration:line-through}
+.pr.you{font-weight:bold}
+#cont-panel{padding:8px 14px;border-bottom:1px solid #1e293b}
+.cr{font-size:11px;padding:2px 0;display:flex;justify-content:space-between}
+.cr .bn{color:#fbbf24;font-weight:bold}
+.cr .ow{color:#22c55e}
+.cr .nn{color:#64748b}
+#log-panel{padding:8px 14px;flex:1;overflow-y:auto;min-height:40px}
+.le{font-size:11px;padding:2px 0;line-height:1.3;border-bottom:1px solid #1e293b20}
+.le.atk{color:#f87171}.le.conq{color:#fbbf24;font-weight:bold}
+.le.elim{color:#a78bfa;font-weight:bold}.le.turn{color:#94a3b8;font-style:italic;margin-top:3px;border-bottom:none}
+#actions{padding:8px 14px;background:#1e293b;border-top:2px solid #334155;display:flex;flex-wrap:wrap;gap:5px}
+.btn{padding:6px 12px;border:none;border-radius:5px;cursor:pointer;font-size:12px;font-weight:bold;transition:all .15s}
+.btn:hover{filter:brightness(1.15);transform:translateY(-1px)}
+.btn:disabled{opacity:.3;cursor:default;transform:none;filter:none}
+.btn-p{background:#3b82f6;color:#fff}.btn-a{background:#ef4444;color:#fff}
+.btn-f{background:#06b6d4;color:#fff}.btn-e{background:#8b5cf6;color:#fff}
+.btn-s{background:#334155;color:#94a3b8}.btn-r{background:#22c55e;color:#fff}
+.btn-t{background:#f59e0b;color:#1e293b}
+#dice-modal{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#111827ee;border:2px solid #fbbf24;border-radius:14px;padding:24px 36px;z-index:20;display:none;backdrop-filter:blur(6px);text-align:center;min-width:300px}
+#dice-modal h2{color:#fbbf24;margin-bottom:10px;font-size:18px}
+.dice-row{display:flex;gap:30px;justify-content:center;margin:12px 0}
+.dice-side{text-align:center}
+.dice-side .dl{font-size:10px;color:#94a3b8;margin-bottom:3px}
+.dice-side .dd{display:flex;gap:4px;justify-content:center}
+.die{width:34px;height:34px;background:#1e293b;border:2px solid #475569;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:bold}
+.die.win{border-color:#22c55e;color:#22c55e}.die.lose{border-color:#ef4444;color:#ef4444}
+#dice-msg{margin:8px 0;font-size:14px;font-weight:bold}
+#overlay{position:absolute;inset:0;background:#000000cc;display:none;z-index:30;flex-direction:column;justify-content:center;align-items:center}
+#overlay h1{font-size:38px;margin-bottom:6px}
+#overlay p{font-size:16px;color:#94a3b8;margin-bottom:16px}
+#start-overlay{position:absolute;inset:0;background:#0a0e1a;z-index:40;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:20px}
+#start-overlay h1{font-size:48px;color:#fbbf24;text-shadow:0 0 30px #fbbf2466}
+#start-overlay p{color:#94a3b8;font-size:16px;max-width:500px;text-align:center;line-height:1.5}
+.diff-btns{display:flex;gap:16px;margin-top:10px}
+.diff-btn{padding:16px 28px;border:3px solid #334155;border-radius:12px;background:#111827;cursor:pointer;text-align:center;transition:all .2s;min-width:140px}
+.diff-btn:hover{transform:translateY(-4px);border-color:#fbbf24}
+.diff-btn h3{font-size:20px;margin-bottom:4px}
+.diff-btn .dd{font-size:12px;color:#94a3b8;line-height:1.4}
+.diff-btn.easy:hover{border-color:#22c55e;box-shadow:0 0 20px #22c55e44}
+.diff-btn.easy:hover h3{color:#22c55e}
+.diff-btn.medium:hover{border-color:#f59e0b;box-shadow:0 0 20px #f59e0b44}
+.diff-btn.medium:hover h3{color:#f59e0b}
+.diff-btn.hard:hover{border-color:#ef4444;box-shadow:0 0 20px #ef444444}
+.diff-btn.hard:hover h3{color:#ef4444}
+#tut-overlay{position:absolute;inset:0;z-index:25;display:none;pointer-events:none}
+#tut-box{position:absolute;background:#1e293bee;border:2px solid #f59e0b;border-radius:12px;padding:18px 22px;max-width:400px;backdrop-filter:blur(6px);pointer-events:auto}
+#tut-box h3{color:#f59e0b;margin-bottom:4px;font-size:15px}
+#tut-box p{font-size:12px;line-height:1.5;color:#e2e8f0;margin-bottom:8px}
+.tut-nav{display:flex;gap:6px;justify-content:flex-end}
+.tut-nav .btn{font-size:11px;padding:4px 10px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="map-wrap">
+    <canvas id="map"></canvas>
+    <div id="help-bar"><span class="pb" id="h-badge">VAHVISTUS</span><span id="h-text"></span></div>
+    <div id="dice-modal"><h2>Taistelu</h2><div class="dice-row" id="dice-results"></div><div id="dice-msg"></div><button class="btn btn-p" id="dice-ok">OK</button></div>
+    <div id="overlay"><h1 id="go-text"></h1><p>Maailma on vallattu!</p><button class="btn btn-r" onclick="startNewGame()">Uusi peli</button><button class="btn btn-t" onclick="openTutorial()">Tutorial</button></div>
+    <div id="start-overlay">
+      <h1>Maailman Valloitus</h1>
+      <p>Risk-tyylinen strategiapeli. Valloita kaikki alueet ja kukista vastustajat!</p>
+      <p style="font-size:13px;color:#64748b">Valitse vaikeustaso:</p>
+      <div class="diff-btns">
+        <div class="diff-btn easy" onclick="startGame('easy')"><h3>Helppo</h3><div class="dd">1 botti<br>+5 aloitusarmeijaa<br>50% enemmän vahvistuksia<br>Botit tekevät virheitä</div></div>
+        <div class="diff-btn medium" onclick="startGame('medium')"><h3>Keskitaso</h3><div class="dd">2 bottia<br>+2 aloitusarmeijaa<br>20% enemmän vahvistuksia<br>Botit kohtuullisia</div></div>
+        <div class="diff-btn hard" onclick="startGame('hard')"><h3>Vaikea</h3><div class="dd">3 bottia<br>Ei aloitusbonusta<br>Normaalit vahvistukset<br>Botit aggressiivisia</div></div>
+      </div>
+    </div>
+    <div id="tut-overlay"><div id="tut-box"><h3 id="tut-title"></h3><p id="tut-text"></p><div class="tut-nav"><button class="btn btn-s" id="tut-prev">Edellinen</button><button class="btn btn-p" id="tut-next">Seuraava</button></div></div></div>
+  </div>
+  <div id="sidebar">
+    <div id="top-info">
+      <h1>Maailman Valloitus</h1>
+      <div id="turn-row"><span>Vuoro <span id="turn-num">1</span></span><span style="font-size:11px;color:#64748b">Space = seuraava</span></div>
+      <div id="phase-bar"><div class="pd" id="pd0"></div><div class="pd" id="pd1"></div><div class="pd" id="pd2"></div><span id="phase-label">VAHVISTUS</span></div>
+    </div>
+    <div id="scroll-area">
+    <div id="player-info"><span class="pn" id="cur-player">Sinä</span><span id="diff-badge"></span></div>
+    <div id="reinforce-info">Vahvistuksia: <span id="reinforce-count">0</span></div>
+    <div id="players-panel"><h3>Pelaajat</h3><div id="players-list"></div></div>
+    <div id="cont-panel"><h3>Mantereet</h3><div id="cont-list"></div></div>
+    <div id="log-panel"><h3>Loki</h3><div id="log-entries"></div></div>
+    </div>
+    <div id="actions"></div>
+  </div>
+</div>
+<script>
+const CONT={"P-Amerikka":"#1a3050","E-Amerikka":"#1a3a28","Eurooppa":"#2a1a3a","Afrikka":"#3a2a1a","Aasia":"#2a1a30","Oseania":"#1a3030"};
+const CB={"P-Amerikka":5,"E-Amerikka":2,"Eurooppa":5,"Afrikka":3,"Aasia":7,"Oseania":2};
+const PL=[
+  {name:"Sinä",m:"#3b82f6",l:"#60a5fa",bg:"#1a3a5f"},
+  {name:"Aggressiivinen",m:"#ef4444",l:"#f87171",bg:"#5a1a1a"},
+  {name:"Varovainen",m:"#22c55e",l:"#4ade80",bg:"#1a4a2a"},
+  {name:"Tasapainoinen",m:"#f59e0b",l:"#fbbf24",bg:"#4a3a1a"}
+];
+const PN=["VAHVISTUS","HYÖKKÄYS","LINNOITUS","BOTIT...","PELI OHI"];
+const DIFF={
+  easy:{label:"Helppo",bots:1,startBonus:5,reinfMult:1.5,botSkip:0.5,botMaxAtks:8},
+  medium:{label:"Keskitaso",bots:2,startBonus:2,reinfMult:1.2,botSkip:0.2,botMaxAtks:15},
+  hard:{label:"Vaikea",bots:3,startBonus:0,reinfMult:1.0,botSkip:0,botMaxAtks:30}
+};
+const TD={
+  "Alaska":{c:"P-Amerikka",x:78,y:58,r:[28,18,22,28,22,24],nb:["NW-Kanada","Kamchatka"]},
+  "NW-Kanada":{c:"P-Amerikka",x:138,y:48,r:[28,22,22,28,22,22],nb:["Alaska","Alberta","Keski-Kanada","Grönlanti"]},
+  "Alberta":{c:"P-Amerikka",x:128,y:98,r:[22,22,28,28,22,22],nb:["NW-Kanada","Keski-Kanada","Länsi-USA"]},
+  "Keski-Kanada":{c:"P-Amerikka",x:192,y:85,r:[28,22,22,28,22,22],nb:["NW-Kanada","Alberta","Ontario","Länsi-USA"]},
+  "Ontario":{c:"P-Amerikka",x:200,y:128,r:[22,22,28,28,22,22],nb:["Keski-Kanada","Länsi-USA","Itä-USA","Quebec"]},
+  "Quebec":{c:"P-Amerikka",x:255,y:108,r:[28,22,28,28,22,22],nb:["Ontario","Itä-USA","Grönlanti"]},
+  "Länsi-USA":{c:"P-Amerikka",x:148,y:158,r:[28,22,30,30,22,22],nb:["Alberta","Keski-Kanada","Ontario","Itä-USA","Keski-Amerikka"]},
+  "Itä-USA":{c:"P-Amerikka",x:215,y:160,r:[28,22,28,30,22,22],nb:["Ontario","Quebec","Länsi-USA","Keski-Amerikka"]},
+  "Keski-Amerikka":{c:"P-Amerikka",x:162,y:215,r:[22,22,28,28,22,22],nb:["Länsi-USA","Itä-USA","Kolumbia"]},
+  "Grönlanti":{c:"P-Amerikka",x:320,y:45,r:[34,28,28,30,24,24],nb:["NW-Kanada","Quebec","Islanti"]},
+  "Kolumbia":{c:"E-Amerikka",x:198,y:275,r:[24,22,28,28,22,22],nb:["Keski-Amerikka","Venezuela","Peru","Brasilia"]},
+  "Venezuela":{c:"E-Amerikka",x:248,y:255,r:[22,22,28,28,22,22],nb:["Kolumbia","Brasilia"]},
+  "Peru":{c:"E-Amerikka",x:190,y:325,r:[22,22,28,28,22,28],nb:["Kolumbia","Brasilia","Argentiina"]},
+  "Brasilia":{c:"E-Amerikka",x:252,y:315,r:[30,22,30,30,22,22],nb:["Kolumbia","Venezuela","Peru","Argentiina"]},
+  "Argentiina":{c:"E-Amerikka",x:200,y:378,r:[22,22,30,30,22,28],nb:["Peru","Brasilia"]},
+  "Islanti":{c:"Eurooppa",x:390,y:82,r:[22,22,22,22,22,22],nb:["Grönlanti","Skandinavia","Britannia"]},
+  "Skandinavia":{c:"Eurooppa",x:442,y:78,r:[28,22,22,28,22,22],nb:["Islanti","Britannia","P-Eurooppa","Ukraina"]},
+  "Britannia":{c:"Eurooppa",x:398,y:150,r:[24,22,28,28,22,22],nb:["Islanti","Skandinavia","P-Eurooppa","L-Eurooppa"]},
+  "P-Eurooppa":{c:"Eurooppa",x:462,y:142,r:[28,22,22,28,22,22],nb:["Skandinavia","Britannia","L-Eurooppa","E-Eurooppa","Ukraina"]},
+  "L-Eurooppa":{c:"Eurooppa",x:410,y:212,r:[24,22,28,28,22,22],nb:["Britannia","P-Eurooppa","E-Eurooppa","P-Afrikka"]},
+  "E-Eurooppa":{c:"Eurooppa",x:470,y:208,r:[28,22,22,28,22,22],nb:["P-Eurooppa","L-Eurooppa","Ukraina","Lähi-itä","P-Afrikka","Egypti"]},
+  "Ukraina":{c:"Eurooppa",x:530,y:115,r:[30,22,22,30,22,22],nb:["Skandinavia","P-Eurooppa","E-Eurooppa","Lähi-itä","Afganistan","Ural"]},
+  "P-Afrikka":{c:"Afrikka",x:418,y:278,r:[28,22,28,30,22,22],nb:["L-Eurooppa","E-Eurooppa","Egypti","Itä-Afrikka","Kongo"]},
+  "Egypti":{c:"Afrikka",x:482,y:252,r:[24,24,28,28,22,22],nb:["E-Eurooppa","P-Afrikka","Itä-Afrikka","Lähi-itä"]},
+  "Itä-Afrikka":{c:"Afrikka",x:510,y:325,r:[30,22,28,30,22,22],nb:["P-Afrikka","Egypti","Kongo","E-Afrikka","Madagaskar","Lähi-itä"]},
+  "Kongo":{c:"Afrikka",x:462,y:355,r:[28,22,28,28,22,22],nb:["P-Afrikka","Itä-Afrikka","E-Afrikka"]},
+  "E-Afrikka":{c:"Afrikka",x:475,y:415,r:[28,22,30,30,22,22],nb:["Kongo","Itä-Afrikka","Madagaskar"]},
+  "Madagaskar":{c:"Afrikka",x:545,y:412,r:[26,24,26,26,24,24],nb:["Itä-Afrikka","E-Afrikka"]},
+  "Lähi-itä":{c:"Aasia",x:550,y:225,r:[30,22,22,28,22,22],nb:["E-Eurooppa","Egypti","Itä-Afrikka","Afganistan","Intia","Ukraina"]},
+  "Afganistan":{c:"Aasia",x:610,y:165,r:[28,22,22,28,22,22],nb:["Ukraina","Ural","Lähi-itä","Intia","Kiina"]},
+  "Ural":{c:"Aasia",x:628,y:88,r:[30,22,22,28,22,22],nb:["Ukraina","Afganistan","Siperia","Jakutia"]},
+  "Siperia":{c:"Aasia",x:702,y:88,r:[30,22,22,28,22,22],nb:["Ural","Jakutia","Mongolia","Irkutsk"]},
+  "Jakutia":{c:"Aasia",x:752,y:52,r:[28,22,22,28,22,22],nb:["Ural","Siperia","Irkutsk","Kamchatka"]},
+  "Irkutsk":{c:"Aasia",x:752,y:128,r:[28,22,22,28,22,22],nb:["Siperia","Jakutia","Mongolia","Kamchatka"]},
+  "Kamchatka":{c:"Aasia",x:808,y:72,r:[30,22,22,28,22,22],nb:["Alaska","Jakutia","Irkutsk","Mongolia","Japani"]},
+  "Mongolia":{c:"Aasia",x:720,y:178,r:[28,22,22,28,22,22],nb:["Siperia","Irkutsk","Kamchatka","Japani","Kiina"]},
+  "Japani":{c:"Aasia",x:812,y:168,r:[22,22,22,22,22,22],nb:["Kamchatka","Mongolia","Kiina"]},
+  "Kiina":{c:"Aasia",x:690,y:235,r:[30,22,28,30,22,22],nb:["Afganistan","Mongolia","Japani","Intia","KA-Aasia"]},
+  "Intia":{c:"Aasia",x:620,y:265,r:[28,22,28,28,22,22],nb:["Lähi-itä","Afganistan","Kiina","KA-Aasia"]},
+  "KA-Aasia":{c:"Aasia",x:722,y:295,r:[28,22,28,28,22,22],nb:["Kiina","Intia","Indonesia"]},
+  "Indonesia":{c:"Oseania",x:762,y:350,r:[26,22,30,28,22,22],nb:["KA-Aasia","L-Aus","Uusi-Guinea"]},
+  "L-Aus":{c:"Oseania",x:795,y:412,r:[28,22,28,28,22,22],nb:["Indonesia","I-Aus"]},
+  "I-Aus":{c:"Oseania",x:842,y:402,r:[28,22,28,28,22,22],nb:["L-Aus","Uusi-Guinea"]},
+  "Uusi-Guinea":{c:"Oseania",x:820,y:332,r:[26,22,28,28,22,22],nb:["Indonesia","I-Aus"]}
+};
+const CM={};
+for(const n in TD){const d=TD[n];if(!CM[d.c])CM[d.c]={m:[],color:CONT[d.c]};CM[d.c].m.push(n)}
+function getPoly(n){const d=TD[n],p=[];for(let i=0;i<6;i++){const a=i*Math.PI/3-Math.PI/6;p.push([d.x+d.r[i]*Math.cos(a),d.y+d.r[i]*Math.sin(a)])}return p}
+function pip(pt,po){let ins=false;for(let i=0,j=po.length-1;i<po.length;j=i++){const xi=po[i][0],yi=po[i][1],xj=po[j][0],yj=po[j][1];if((yi>pt[1])!=(yj>pt[1])&&pt[0]<(xj-xi)*(pt[1]-yi)/(yj-yi)+xi)ins=!ins}return ins}
+
+let G=null,canvas,ctx,W,H,sc,oX,oY;
+const MW=900,MH=500;
+let animTime=0;
+let soldiers=[]; // animated running soldiers
+let battleFx=[]; // battle effects (explosions, flags)
+
+function resize(){canvas=document.getElementById('map');const wr=document.getElementById('map-wrap');W=wr.clientWidth;H=wr.clientHeight-40;canvas.width=W;canvas.height=H;ctx=canvas.getContext('2d');sc=Math.min(W/MW,H/MH)*0.95;oX=(W-MW*sc)/2;oY=(H-MH*sc)/2}
+function ts(x,y){return[x*sc+oX,y*sc+oY]}
+function fm(sx,sy){return[(sx-oX)/sc,(sy-oY)/sc]}
+function tAt(sx,sy){const[mx,my]=fm(sx,sy);for(const n in TD)if(pip([mx,my],getPoly(n)))return n;return null}
+
+class Game{
+  constructor(d){
+    this.df=d;this.dc=DIFF[d];
+    this.t={};for(const n in TD)this.t[n]={owner:-1,armies:0};
+    this.np=1+this.dc.bots;
+    this.alive=new Set();for(let i=0;i<this.np;i++)this.alive.add(i);
+    this.cur=0;this.phase=0;this.reinf=0;
+    this.sel=null;this.tgt=null;this.fs=null;
+    this.turn=1;this.log=[];this.dr=null;
+    this.over=false;this.winner=-1;this.conq=false;
+    this.aiT=null;this.hov=null;
+    this._dist();
+  }
+  _dist(){
+    const ns=Object.keys(TD),sh=[...ns].sort(()=>Math.random()-0.5);
+    for(let i=0;i<sh.length;i++){
+      const t=this.t[sh[i]];t.owner=i%this.np;
+      t.armies=Math.max(1,Math.min(3,Math.floor(Math.random()*3)+1));
+    }
+    // Give player starting bonus distributed across their territories
+    if(this.dc.startBonus>0){
+      const p0=Object.keys(this.t).filter(n=>this.t[n].owner===0);
+      let bonus=this.dc.startBonus;
+      while(bonus>0){const n=p0[Math.floor(Math.random()*p0.length)];this.t[n].armies++;bonus--;}
+    }
+    this._calcR();
+    this._log("--- Peli alkaa! Vaikeustaso: "+this.dc.label+" ---","turn");
+  }
+  _calcR(){
+    const p=this.cur,ow=Object.keys(this.t).filter(n=>this.t[n].owner===p);
+    if(!ow.length){this.reinf=0;return}
+    let base=Math.max(3,Math.floor(ow.length/3));
+    let bonus=0;
+    for(const cn in CB)if(Object.keys(TD).filter(n=>TD[n].c===cn).every(n=>this.t[n].owner===p))bonus+=CB[cn];
+    if(p===0){base=Math.round(base*this.dc.reinfMult);bonus=Math.round(bonus*this.dc.reinfMult)}
+    this.reinf=base+bonus;
+  }
+  _adj(a,b){return TD[a].nb.includes(b)}
+  _roll(n){return Array.from({length:n},()=>1+Math.floor(Math.random()*6)).sort((a,b)=>b-a)}
+  _doAtk(from,to,num){
+    const atk=this.t[from],def=this.t[to];
+    const ad=this._roll(Math.min(num,atk.armies-1));
+    const dd=this._roll(Math.min(2,def.armies));
+    let al=0,dl=0;
+    for(let i=0;i<Math.min(ad.length,dd.length);i++){if(ad[i]>dd[i])dl++;else al++}
+    atk.armies-=al;def.armies-=dl;
+    // Spawn running soldiers animation
+    spawnSoldiers(from,to,Math.min(num,atk.armies+al),atk.owner);
+    // Spawn battle effects at target
+    spawnBattle(to,def.owner);
+    let conq=false;
+    if(def.armies<=0){
+      conq=true;const old=def.owner;
+      def.owner=atk.owner;
+      const mv=Math.max(num,atk.armies-1);
+      def.armies=Math.max(1,Math.min(mv,atk.armies-1));
+      atk.armies-=def.armies;this.conq=true;
+      this._log(PL[atk.owner].name+" valloitti "+to+"!","conq");
+      const ok=new Set(Object.values(this.t).map(t=>t.owner));
+      if(!ok.has(old)){this.alive.delete(old);this._log(PL[old].name+" eliminoitu!","elim")}
+    } else {
+      this._log(PL[atk.owner].name+": "+from+" → "+to+" (-"+al+", -"+dl+")","atk");
+    }
+    this.dr={ad,dd,al,dl,conq,from,to};return conq;
+  }
+  _log(m,t=''){this.log.push({m,t});if(this.log.length>80)this.log.shift()}
+  _chkWin(){
+    for(let p=0;p<this.np;p++){if(Object.values(this.t).every(t=>t.owner===p)){this.over=true;this.winner=p;this.phase=4;return true}}
+    if(this.alive.size<=1){this.winner=[...this.alive][0];this.over=true;this.phase=4;return true}
+    return false;
+  }
+  endTurn(){
+    this.sel=null;this.tgt=null;this.fs=null;this.conq=false;
+    let nx=(this.cur+1)%this.np;
+    while(!this.alive.has(nx)){nx=(nx+1)%this.np;if(nx===this.cur)break}
+    this.cur=nx;
+    if(nx===0)this.turn++;
+    if(nx===0){this.phase=0;this._calcR();this._log("--- Vuoro "+this.turn+" ---","turn")}
+    else{this.phase=3;this._runAI()}
+  }
+  _runAI(){
+    const p=this.cur;this._calcR();
+    this._log("--- "+PL[p].name+" vuoro ---","turn");
+    this._aiR(p);
+    const atks=this._aiA(p);
+    this._aiF(p);
+    this.aiT=setTimeout(()=>{this._chkWin();this.endTurn();updateUI()},500+atks*180);
+  }
+  _aiR(p){
+    const ow=Object.keys(this.t).filter(n=>this.t[n].owner===p);
+    const bd=ow.filter(n=>TD[n].nb.some(nb=>this.t[nb].owner!==p));
+    const pool=bd.length?bd:ow;
+    while(this.reinf>0){
+      let n;
+      if(p===1)n=this._aiAg(pool);else if(p===2)n=this._aiDf(pool);else n=this._aiBl(pool);
+      if(!n)n=pool[Math.floor(Math.random()*pool.length)];
+      this.t[n].armies++;this.reinf--;
+    }
+  }
+  _aiAg(pool){let b=null,bs=-999;for(const n of pool){const en=TD[n].nb.filter(nb=>this.t[nb].owner!==this.t[n].owner);if(!en.length)continue;const wk=en.reduce((a,b)=>this.t[a].armies<this.t[b].armies?a:b);const s=this.t[n].armies-this.t[wk].armies+en.length*3;if(s>bs){bs=s;b=n}}return b}
+  _aiDf(pool){let b=null,bt=0;for(const n of pool){const th=TD[n].nb.filter(nb=>this.t[nb].owner!==this.t[n].owner).reduce((s,nb)=>s+this.t[nb].armies,0);const nd=th-this.t[n].armies*2;if(nd>bt){bt=nd;b=n}}return b}
+  _aiBl(pool){let b=null,bs=-999;for(const n of pool){const en=TD[n].nb.filter(nb=>this.t[nb].owner!==this.t[n].owner);if(!en.length)continue;const th=en.reduce((s,nb)=>s+this.t[nb].armies,0);const s=en.length*3+(th>this.t[n].armies*2?8:0)-this.t[n].armies;if(s>bs){bs=s;b=n}}return b}
+  _aiA(p){
+    let cnt=0;
+    for(let it=0;it<this.dc.botMaxAtks;it++){
+      const ak=Object.keys(this.t).filter(n=>this.t[n].owner===p&&this.t[n].armies>1).map(n=>({n,t:TD[n].nb.filter(nb=>this.t[nb].owner!==p).map(nb=>({nb,s:this.t[n].armies-this.t[nb].armies}))})).filter(x=>x.t.length);
+      if(!ak.length)break;
+      const all=[];for(const a of ak)for(const t of a.t)all.push({f:a.n,to:t.nb,s:t.s});
+      all.sort((a,b)=>b.s-a.s);
+      if(Math.random()<this.dc.botSkip){if(Math.random()>0.3)break;continue}
+      let ch;
+      if(p===1)ch=all[0].s>=1?all[0]:(Math.random()>0.3?all[0]:null);
+      else if(p===2)ch=all[0].s>=2?all[0]:null;
+      else ch=all[0].s>=0?all[0]:(Math.random()>0.4?null:all[0]);
+      if(!ch)break;
+      const nd=Math.min(3,this.t[ch.f].armies-1);if(nd<1)break;
+      this._doAtk(ch.f,ch.to,nd);cnt++;
+      if(this._chkWin())return cnt;
+    }
+    return cnt;
+  }
+  _aiF(p){
+    const ow=Object.keys(this.t).filter(n=>this.t[n].owner===p);
+    for(const n of ow){const t=this.t[n];if(t.armies<=1)continue;if(TD[n].nb.some(nb=>this.t[nb].owner!==p))continue;for(const nb of TD[n].nb){if(this.t[nb].owner===p&&TD[nb].nb.some(nnb=>this.t[nnb].owner!==p)){const mv=t.armies-1;this.t[nb].armies+=mv;t.armies=1;break}}}
+  }
+}
+
+// ===================== ANIMATIONS =====================
+function spawnSoldiers(from,to,count,owner){
+  const[fx,fy]=ts(TD[from].x,TD[from].y);
+  const[tx,ty]=ts(TD[to].x,TD[to].y);
+  for(let i=0;i<Math.min(count,6);i++){
+    soldiers.push({
+      x:fx,y:fy,tx,ty,
+      progress:0,
+      speed:0.012+Math.random()*0.008,
+      delay:i*80,
+      start:performance.now()+i*80,
+      owner,
+      phase:0 // 0=running, 1=fighting
+    });
+  }
+}
+
+function spawnBattle(to,defOwner){
+  const[tx,ty]=ts(TD[to].x,TD[to].y);
+  const now=performance.now();
+  // Explosion flashes
+  for(let i=0;i<8;i++){
+    battleFx.push({
+      x:tx+(Math.random()-0.5)*30*sc,
+      y:ty+(Math.random()-0.5)*20*sc,
+      start:now+i*50,
+      duration:300+Math.random()*200,
+      type:'flash'
+    });
+  }
+  // Smoke puffs
+  for(let i=0;i<5;i++){
+    battleFx.push({
+      x:tx+(Math.random()-0.5)*40*sc,
+      y:ty+(Math.random()-0.5)*30*sc,
+      start:now+100+i*80,
+      duration:600+Math.random()*400,
+      type:'smoke',
+      vx:(Math.random()-0.5)*0.3,
+      vy:-0.2-Math.random()*0.3
+    });
+  }
+  // Flag planting if conquered
+  battleFx.push({
+    x:tx,y:ty-20*sc,
+    start:now+400,
+    duration:2000,
+    type:'flag',
+    owner:defOwner
+  });
+}
+
+function drawSoldier(x,y,owner,frame,angle){
+  const c=PL[owner];
+  const s=3*sc;
+  // Body
+  ctx.fillStyle=c.m;
+  ctx.beginPath();
+  ctx.ellipse(x,y+2*s,s*1.2,s*2.2,0,0,Math.PI*2);
+  ctx.fill();
+  // Head
+  ctx.fillStyle=c.l;
+  ctx.beginPath();
+  ctx.arc(x,y-s*0.5,s*1.1,0,Math.PI*2);
+  ctx.fill();
+  // Helmet
+  ctx.fillStyle=c.bg;
+  ctx.beginPath();
+  ctx.arc(x,y-s*0.8,s*1.0,Math.PI,0);
+  ctx.fill();
+  // Legs (animated)
+  const legSwing=Math.sin(frame*0.15)*s*1.2;
+  ctx.strokeStyle=c.m;ctx.lineWidth=s*0.6;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(x-s*0.3,y+s*1.5);ctx.lineTo(x-s*0.3+legSwing,y+s*3.5);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x+s*0.3,y+s*1.5);ctx.lineTo(x+s*0.3-legSwing,y+s*3.5);ctx.stroke();
+  // Weapon (sword/rifle)
+  ctx.strokeStyle='#94a3b8';ctx.lineWidth=s*0.4;
+  const wx=x+s*2*Math.cos(angle);
+  const wy=y+s*2*Math.sin(angle);
+  ctx.beginPath();ctx.moveTo(x+s*0.5,y);ctx.lineTo(wx,wy);ctx.stroke();
+}
+
+function drawGarrisonSoldiers(name,frame){
+  const t=G.t[name];
+  const td=TD[name];
+  const[cx,cy]=ts(td.x,td.y);
+  const count=Math.min(t.armies,12);
+  const owner=t.owner;
+  if(owner<0||count<=0)return;
+  // Arrange soldiers in formation
+  const cols=Math.min(count,4);
+  const rows=Math.ceil(count/cols);
+  const spacing=7*sc;
+  const startX=cx-(cols-1)*spacing/2;
+  const startY=cy+8*sc-(rows-1)*spacing*0.8/2;
+  for(let i=0;i<count;i++){
+    const col=i%cols;
+    const row=Math.floor(i/cols);
+    const sx=startX+col*spacing+(row%2)*spacing*0.3;
+    const sy=startY+row*spacing*0.8;
+    const bob=Math.sin(frame*0.03+i*0.7)*1.5*sc;
+    drawSoldier(sx,sy+bob,owner,frame+i*3,Math.PI*0.5);
+  }
+}
+
+function updateAnimations(now){
+  // Update soldiers
+  soldiers=soldiers.filter(s=>{
+    const elapsed=now-s.start;
+    if(elapsed<0)return true;
+    s.progress=Math.min(1,elapsed/800);
+    return s.progress<1;
+  });
+  // Update battle fx
+  battleFx=battleFx.filter(f=>now<f.start+f.duration);
+}
+
+function drawAnimations(now){
+  // Draw running soldiers
+  for(const s of soldiers){
+    const elapsed=now-s.start;
+    if(elapsed<0)continue;
+    const t=s.progress;
+    // Ease in-out
+    const et=t<0.5?2*t*t:-1+(4-2*t)*t;
+    const x=s.x+(s.tx-s.x)*et;
+    const y=s.y+(s.ty-s.y)*et;
+    // Arc path
+    const arc=Math.sin(t*Math.PI)*30*sc;
+    drawSoldier(x,y-arc,s.owner,elapsed*0.01,Math.atan2(s.ty-s.y,s.tx-s.x));
+  }
+  // Draw battle effects
+  for(const f of battleFx){
+    const elapsed=now-f.start;
+    if(elapsed<0)continue;
+    const t=elapsed/f.duration;
+    if(f.type==='flash'){
+      const alpha=(1-t)*0.8;
+      const r=8*sc*(1+t*2);
+      ctx.fillStyle='rgba(255,200,50,'+alpha+')';
+      ctx.beginPath();ctx.arc(f.x,f.y,r,0,Math.PI*2);ctx.fill();
+      // Spark
+      ctx.fillStyle='rgba(255,255,200,'+(1-t)*0.5+')';
+      ctx.beginPath();ctx.arc(f.x,f.y,r*0.3,0,Math.PI*2);ctx.fill();
+    }else if(f.type==='smoke'){
+      const alpha=(1-t)*0.4;
+      const r=12*sc*(1+t*1.5);
+      const x=f.x+(f.vx||0)*elapsed;
+      const y=f.y+(f.vy||0)*elapsed;
+      ctx.fillStyle='rgba(100,100,120,'+alpha+')';
+      ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+    }else if(f.type==='flag'){
+      const alpha=Math.min(1,t*3)*(1-Math.max(0,(t-0.7)*3.3));
+      if(alpha>0){
+        // Flag pole
+        ctx.strokeStyle='#64748b';ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(f.x,f.y);ctx.lineTo(f.x,f.y-20*sc);ctx.stroke();
+        // Flag
+        const owner=f.owner>=0?f.owner:0;
+        ctx.fillStyle=PL[owner].m.slice(0,-1)+','+alpha+')';
+        ctx.globalAlpha=alpha;
+        ctx.fillRect(f.x,f.y-20*sc,12*sc,8*sc);
+        ctx.globalAlpha=1;
+      }
+    }
+  }
+}
+
+// ===================== DRAWING =====================
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  const g=G;if(!g)return;
+  animTime=performance.now();
+  updateAnimations(animTime);
+
+  const grd=ctx.createLinearGradient(0,0,0,H);
+  grd.addColorStop(0,'#0a1628');grd.addColorStop(1,'#0f1d32');
+  ctx.fillStyle=grd;ctx.fillRect(0,0,W,H);
+  // Grid
+  ctx.strokeStyle='#15203a';ctx.lineWidth=0.5;
+  for(let x=0;x<W;x+=50){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  for(let y=0;y<H;y+=50){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+
+  // Continent backgrounds
+  for(const cn in CM){
+    const cm=CM[cn];
+    ctx.beginPath();
+    const first=getPoly(cm.m[0]);
+    ctx.moveTo(...ts(...first[0]));
+    for(let i=1;i<first.length;i++)ctx.lineTo(...ts(...first[i]));
+    ctx.closePath();
+    for(let m=1;m<cm.m.length;m++){
+      const poly=getPoly(cm.m[m]);
+      ctx.moveTo(...ts(...poly[0]));
+      for(let i=1;i<poly.length;i++)ctx.lineTo(...ts(...poly[i]));
+      ctx.closePath();
+    }
+    ctx.fillStyle=cm.color+'44';ctx.fill();
+  }
+
+  // Connections
+  const drawn=new Set();
+  for(const n in TD){
+    for(const nb of TD[n].nb){
+      const key=[n,nb].sort().join('|');
+      if(drawn.has(key))continue;drawn.add(key);
+      const[x1,y1]=ts(TD[n].x,TD[n].y);
+      const[x2,y2]=ts(TD[nb].x,TD[nb].y);
+      ctx.strokeStyle='#2a3a5588';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    }
+  }
+
+  // Territories
+  for(const n in TD){
+    const td=TD[n];const t=g.t[n];
+    const poly=getPoly(n);const sp=poly.map(pt=>ts(...pt));
+    ctx.beginPath();ctx.moveTo(...sp[0]);
+    for(let i=1;i<sp.length;i++)ctx.lineTo(...sp[i]);
+    ctx.closePath();
+    if(t.owner>=0){
+      ctx.fillStyle=PL[t.owner].bg;ctx.fill();
+      ctx.strokeStyle=PL[t.owner].m;ctx.lineWidth=2;ctx.stroke();
+    }else{ctx.fillStyle='#1a2234';ctx.fill();ctx.strokeStyle='#334155';ctx.lineWidth=1;ctx.stroke()}
+    // Highlights
+    if(g.sel===n&&g.phase===1){ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.stroke();ctx.shadowColor='#fff';ctx.shadowBlur=12;ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();ctx.shadowBlur=0}
+    if(g.tgt===n){ctx.strokeStyle='#fbbf24';ctx.lineWidth=3;ctx.stroke()}
+    if(g.fs===n){ctx.strokeStyle='#06b6d4';ctx.lineWidth=3;ctx.stroke()}
+    if(g.hov===n&&g.sel!==n&&g.tgt!==n){ctx.strokeStyle='#94a3b888';ctx.lineWidth=2;ctx.stroke()}
+    if(g.sel&&g.phase===1&&g.t[n].owner!==g.cur&&g._adj(g.sel,n)){ctx.strokeStyle='#f8717188';ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.stroke();ctx.setLineDash([])}
+    if(g.fs&&g.phase===2&&g.t[n].owner===g.cur&&g._adj(g.fs,n)&&g.fs!==n){ctx.strokeStyle='#4ade8088';ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.stroke();ctx.setLineDash([])}
+    // Name
+    const[sx,sy]=ts(td.x,td.y);
+    ctx.fillStyle='#94a3b8';ctx.font=`${Math.round(9*sc)}px Arial`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(n,sx,sy-24*sc);
+  }
+
+  // Garrison soldiers
+  for(const n in TD)drawGarrisonSoldiers(n,animTime);
+
+  // Animated soldiers & effects
+  drawAnimations(animTime);
+
+  // Army count on top
+  for(const n in TD){
+    const td=TD[n];const t=g.t[n];
+    const[sx,sy]=ts(td.x,td.y);
+    ctx.fillStyle='#fff';ctx.font=`bold ${Math.round(14*sc)}px Arial`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.shadowColor='#000';ctx.shadowBlur=4;
+    ctx.fillText(t.armies,sx,sy+2*sc);
+    ctx.shadowBlur=0;
+  }
+
+  // Attack arrow
+  if(g.sel&&g.phase===1&&g.hov&&g.hov!==g.sel&&g.t[g.hov].owner!==g.cur&&g._adj(g.sel,g.hov)){
+    const[fx,fy]=ts(TD[g.sel].x,TD[g.sel].y);
+    const[tx,ty]=ts(TD[g.hov].x,TD[g.hov].y);
+    ctx.strokeStyle='#f87171';ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(fx,fy);ctx.lineTo(tx,ty);ctx.stroke();
+    const a=Math.atan2(ty-fy,tx-fx);
+    ctx.beginPath();ctx.moveTo(tx,ty);
+    ctx.lineTo(tx-14*sc*Math.cos(a-0.4),ty-14*sc*Math.sin(a-0.4));
+    ctx.lineTo(tx-14*sc*Math.cos(a+0.4),ty-14*sc*Math.sin(a+0.4));
+    ctx.closePath();ctx.fillStyle='#f87171';ctx.fill();
+  }
+}
+
+// ===================== UI =====================
+function updateUI(){
+  const g=G;if(!g)return;
+  document.getElementById('turn-num').textContent=g.turn;
+  document.getElementById('phase-label').textContent=PN[g.phase];
+  document.getElementById('cur-player').textContent=PL[g.cur].name;
+  document.getElementById('cur-player').style.color=PL[g.cur].m;
+  const db=document.getElementById('diff-badge');
+  db.textContent=g.dc.label;
+  db.style.background=g.df==='easy'?'#22c55e':g.df==='medium'?'#f59e0b':'#ef4444';
+  db.style.color=g.df==='easy'?'#fff':g.df==='medium'?'#1e293b':'#fff';
+  document.getElementById('reinforce-count').textContent=g.reinf;
+  const badge=document.getElementById('h-badge');
+  const ht=document.getElementById('h-text');
+  badge.textContent=PN[g.phase];
+  badge.style.background=g.cur===0?PL[0].m:'#334155';
+  if(g.phase===0&&g.cur===0)ht.innerHTML='Klikkaa <span class="ph">sinisiä</span> alueita lisätäksesi joukkoja (jäljellä: <span class="ph">'+g.reinf+'</span>)';
+  else if(g.phase===1&&g.cur===0){
+    if(!g.sel)ht.innerHTML='1) Klikkaa <span class="ph">omaa aluetta</span> (väh. 2 armeijaa) → 2) Klikkaa <span class="pc">vihollisen naapurialuetta</span>';
+    else ht.innerHTML='Hyökkääjä: <span class="ph">'+g.sel+'</span> ('+g.t[g.sel].armies+'). Klikkaa <span class="pc">punaisella merkittyä</span> vihollista.';
+  }
+  else if(g.phase===2&&g.cur===0){
+    if(!g.fs)ht.innerHTML='<span class="ph">LINNOITUS:</span> Siirrä armeijoita sisämaasta rajalle. Klikkaa <span class="ph">lähdettä</span> → <span class="pc">kohdealuetta</span>. Tai ohita.';
+    else ht.innerHTML='Lähde: <span class="ph">'+g.fs+'</span>. Klikkaa <span class="pc">vihreällä merkittyä</span> kohdetta. Tai ohita.';
+  }
+  else if(g.phase===3)ht.innerHTML='<span class="ph">'+PL[g.cur].name+'</span> pelaa...';
+  else if(g.phase===4)ht.innerHTML='<span class="ph">Peli päättynyt!</span>';
+  else ht.textContent='';
+  for(let i=0;i<3;i++){const d=document.getElementById('pd'+i);d.className='pd';if(g.phase===i)d.classList.add('active');else if(g.phase>i||g.phase===3)d.classList.add('done')}
+  document.getElementById('reinforce-info').style.display=(g.phase===0&&g.cur===0)?'block':'none';
+  const pl=document.getElementById('players-list');pl.innerHTML='';
+  for(let i=0;i<g.np;i++){
+    const ow=Object.values(g.t).filter(t=>t.owner===i).length;
+    const ar=Object.values(g.t).filter(t=>t.owner===i).reduce((s,t)=>s+t.armies,0);
+    const al=g.alive.has(i);
+    const row=document.createElement('div');row.className='pr'+(al?'':' dead')+(i===0?' you':'');
+    row.innerHTML='<div class="dt" style="background:'+PL[i].m+'"></div><span>'+PL[i].name+'</span><span class="st">'+ow+' aluetta, '+ar+' armeijaa</span>';
+    pl.appendChild(row);
+  }
+  const cl=document.getElementById('cont-list');cl.innerHTML='';
+  for(const cn in CB){
+    const all=Object.keys(TD).filter(n=>TD[n].c===cn);
+    const owners=new Set(all.map(n=>g.t[n].owner));
+    const row=document.createElement('div');row.className='cr';
+    if(owners.size===1){const o=[...owners][0];row.innerHTML='<span>'+cn+'</span><span class="ow">'+PL[o].name+' ✓</span><span class="bn">+'+CB[cn]+'</span>'}
+    else{const cnt={};all.forEach(n=>{const o=g.t[n].owner;cnt[o]=(cnt[o]||0)+1});const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];row.innerHTML='<span>'+cn+'</span><span class="nn">'+top[1]+'/'+all.length+'</span><span class="bn">+'+CB[cn]+'</span>'}
+    cl.appendChild(row);
+  }
+  const le=document.getElementById('log-entries');le.innerHTML='';
+  for(const e of g.log.slice(-25)){const d=document.createElement('div');d.className='le '+e.t;d.textContent=e.m;le.appendChild(d)}
+  le.scrollTop=le.scrollHeight;
+  const act=document.getElementById('actions');act.innerHTML='';
+  if(g.phase===4){
+    mkBtn(act,'Uusi peli','btn-r',startNewGame);
+    mkBtn(act,'Tutorial','btn-t',openTutorial);
+  }else if(g.cur!==0){
+    mkBtn(act,PL[g.cur].name+' pelaa...','btn-s',null,true);
+  }else{
+    if(g.phase===0){
+      mkBtn(act,'Hyökkäämään ▶','btn-a',()=>{g.phase=1;g.sel=null;g.tgt=null;updateUI()},g.reinf>0);
+      mkBtn(act,'Ohita vahvistus ▶▶','btn-s',()=>{g.reinf=0;g.phase=1;g.sel=null;updateUI()},g.reinf===0);
+    }else if(g.phase===1){
+      mkBtn(act,'Linnoitukseen ▶','btn-f',()=>{g.phase=2;g.sel=null;g.tgt=null;g.fs=null;updateUI()});
+    }else if(g.phase===2){
+      mkBtn(act,'Lopeta vuoro ▶','btn-e',()=>{g.endTurn();updateUI()});
+      mkBtn(act,'Ohita linnoitus ▶▶','btn-s',()=>{g.endTurn();updateUI()});
+    }
+  }
+}
+function mkBtn(p,t,c,fn,dis){const b=document.createElement('button');b.className='btn '+c;b.textContent=t;if(fn)b.onclick=fn;if(dis)b.disabled=true;p.appendChild(b)}
+
+// ===================== INPUT =====================
+function click(sx,sy){
+  const g=G;if(g.phase===4||g.cur!==0||g.phase===3)return;
+  const n=tAt(sx,sy);if(!n)return;const t=g.t[n];
+  if(g.phase===0){
+    if(t.owner===0&&g.reinf>0){t.armies++;g.reinf--;updateUI()}
+  }else if(g.phase===1){
+    if(!g.sel){if(t.owner===0&&t.armies>1){g.sel=n;updateUI()}}
+    else if(!g.tgt){
+      if(n===g.sel){g.sel=null;updateUI()}
+      else if(t.owner!==0&&g._adj(g.sel,n)){
+        g.tgt=n;const nd=Math.min(3,g.t[g.sel].armies-1);g._doAtk(g.sel,n,nd);g._chkWin();showDice(g.dr);
+      }else if(t.owner===0&&t.armies>1){g.sel=n;updateUI()}
+      else{g.sel=null;updateUI()}
+    }
+  }else if(g.phase===2){
+    if(!g.fs){if(t.owner===0&&t.armies>1){g.fs=n;updateUI()}}
+    else{
+      if(n===g.fs){g.fs=null;updateUI()}
+      else if(t.owner===0&&g._adj(g.fs,n)){const src=g.t[g.fs];const dst=g.t[n];const mv=src.armies-1;dst.armies+=mv;src.armies=1;g.fs=null;g.endTurn();updateUI()}
+      else{g.fs=null;updateUI()}
+    }
+  }
+}
+function rclick(){const g=G;g.sel=null;g.tgt=null;g.fs=null;updateUI()}
+function showDice(r){
+  const dm=document.getElementById('dice-modal');dm.style.display='block';
+  document.getElementById('dice-results').innerHTML=
+    '<div class="dice-side"><div class="dl">Hyökkääjä ('+r.from+')</div><div class="dd">'+r.ad.map((d,i)=>'<div class="die '+(i<r.dd.length&&d>r.dd[i]?'win':'lose')+'">'+d+'</div>').join('')+'</div></div>'+
+    '<div class="dice-side"><div class="dl">Puolustaja ('+r.to+')</div><div class="dd">'+r.dd.map((d,i)=>'<div class="die '+(i<r.ad.length&&d>=r.ad[i]?'win':'lose')+'">'+d+'</div>').join('')+'</div></div>';
+  document.getElementById('dice-msg').textContent=r.conq?'Valloitettu! '+r.to+' on sinun!':'Hyökkäys -'+r.al+', puolustus -'+r.dl;
+  document.getElementById('dice-ok').onclick=()=>{dm.style.display='none';if(G.t[r.from]&&G.t[r.from].owner===G.cur&&G.t[r.from].armies>1)G.sel=r.from;else G.sel=null;G.tgt=null;updateUI()};
+}
+function startGame(diff){G=new Game(diff);soldiers=[];battleFx=[];document.getElementById('start-overlay').style.display='none';document.getElementById('dice-modal').style.display='none';updateUI()}
+function startNewGame(){document.getElementById('overlay').style.display='none';document.getElementById('dice-modal').style.display='none';document.getElementById('start-overlay').style.display='flex'}
+function openTutorial(){document.getElementById('overlay').style.display='none';startTut()}
+
+// ===================== TUTORIAL =====================
+const TUT=[
+  {t:"Tervetuloa!",p:"Tämä on Risk-tyylinen strategiapeli. Valloita kaikki 42 aluetta! Valitse vaikeustaso aluksi: Helppo = 1 botti, Keskitaso = 2, Vaikea = 3."},
+  {t:"Kartta",p:"6 maanosaa: P-Amerikka, E-Amerikka, Eurooppa, Afrikka, Aasia, Oseania. Alueilla näet pienen sotilasjoukon ja armeijoiden määrän."},
+  {t:"Vahvistus",p:"Klikkaa omia (sinisiä) alueita lisätäksesi armeijoita. Saat vähintään 3 + 1/3 alueistasi. Mantereista tulee lisäbonuksia."},
+  {t:"Hyökkäys",p:"1) Klikkaa omaa aluetta (väh. 2 armeijaa) 2) Klikkaa viereistä vihollista. Nopat heitetään auto: hyökkääjä max 3, puolustaja max 2. Näet sotilaat juoksemassa!"},
+  {t:"Linnoitus",p:"Vapaaehtoinen: siirrä armeijoita yhdestä omasta alueesta viereiseen omaan. Esim. 8 sisämaasta → rajalle = 9 valmiina hyökkäämään. Usein ohitetaan."},
+  {t:"Vinkit",p:"Vahvista rajoja. Hallitse kokonaisia mantereita. Linnoituksella kerää voimaa. Peli päättyy kun yksi pelaaja jää! Paina T = tutorial, R = uusi peli."}
+];
+let tutS=-1,tutA=false;
+function startTut(){tutA=true;tutS=0;document.getElementById('tut-overlay').style.display='block';showTutS()}
+function closeTut(){tutA=false;tutS=-1;document.getElementById('tut-overlay').style.display='none'}
+function showTutS(){
+  if(tutS<0||tutS>=TUT.length){closeTut();return}
+  const s=TUT[tutS];
+  document.getElementById('tut-title').textContent=s.t;
+  document.getElementById('tut-text').textContent=s.p;
+  document.getElementById('tut-prev').style.display=tutS>0?'inline-block':'none';
+  document.getElementById('tut-next').textContent=tutS<TUT.length-1?'Seuraava':'Valmis';
+  const b=document.getElementById('tut-box');b.style.left='20px';b.style.top='20%';
+}
+document.getElementById('tut-next').addEventListener('click',()=>{if(tutS<TUT.length-1){tutS++;showTutS()}else closeTut()});
+document.getElementById('tut-prev').addEventListener('click',()=>{if(tutS>0){tutS--;showTutS()}});
+
+// ===================== MAIN =====================
+function loop(){draw();requestAnimationFrame(loop)}
+function init(){
+  resize();
+  canvas.addEventListener('click',e=>{const r=canvas.getBoundingClientRect();click(e.clientX-r.left,e.clientY-r.top)});
+  canvas.addEventListener('contextmenu',e=>{e.preventDefault();rclick()});
+  canvas.addEventListener('mousemove',e=>{const r=canvas.getBoundingClientRect();if(G)G.hov=tAt(e.clientX-r.left,e.clientY-r.top)});
+  window.addEventListener('keydown',e=>{
+    if(!G)return;
+    if(e.key===' '||e.key==='Enter'){e.preventDefault();
+      if(G.phase===0&&G.cur===0&&G.reinf===0){G.phase=1;G.sel=null;updateUI()}
+      else if(G.phase===1&&G.cur===0){G.phase=2;G.sel=null;G.tgt=null;G.fs=null;updateUI()}
+      else if(G.phase===2&&G.cur===0){G.endTurn();updateUI()}
+    }
+    if(e.key==='Escape')rclick();
+    if(e.key==='r'||e.key==='R')startNewGame();
+    if(e.key==='t'||e.key==='T'){if(!tutA)startTut();else closeTut()}
+  });
+  window.addEventListener('resize',()=>{resize();if(G)updateUI()});
+  loop();
+}
+setInterval(()=>{if(G&&G.over){const ov=document.getElementById('overlay');if(ov.style.display!=='flex'){ov.style.display='flex';document.getElementById('go-text').textContent=PL[G.winner].name+' voittaa!';document.getElementById('go-text').style.color=PL[G.winner].m}}},200);
+window.onload=init;
+</script>
+</body>
+</html>

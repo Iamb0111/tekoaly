@@ -78,6 +78,9 @@ canvas#map{display:block;width:100%;flex:1;cursor:pointer}
 .diff-btn.medium:hover h3{color:#f59e0b}
 .diff-btn.hard:hover{border-color:#ef4444;box-shadow:0 0 20px #ef444444}
 .diff-btn.hard:hover h3{color:#ef4444}
+.diff-btn.tut-btn{border-color:#8b5cf6}
+.diff-btn.tut-btn:hover{border-color:#a78bfa;box-shadow:0 0 20px #a78bfa44}
+.diff-btn.tut-btn:hover h3{color:#a78bfa}
 #tut-overlay{position:absolute;inset:0;z-index:50;display:none;pointer-events:none;background:rgba(0,0,0,0.5)}
 #tut-box{position:absolute;background:#1e293bee;border:2px solid #f59e0b;border-radius:12px;padding:18px 22px;max-width:400px;backdrop-filter:blur(6px);pointer-events:auto}
 #tut-box h3{color:#f59e0b;margin-bottom:4px;font-size:15px}
@@ -101,6 +104,7 @@ canvas#map{display:block;width:100%;flex:1;cursor:pointer}
         <div class="diff-btn easy" onclick="startGame('easy')"><h3>Helppo</h3><div class="dd">1 botti<br>+5 aloitusarmeijaa<br>50 % enemmän vahvistuksia<br>Botit tekevät virheitä</div></div>
         <div class="diff-btn medium" onclick="startGame('medium')"><h3>Keskitaso</h3><div class="dd">2 bottia<br>+2 aloitusarmeijaa<br>20 % enemmän vahvistuksia<br>Botit kohtuullisia</div></div>
         <div class="diff-btn hard" onclick="startGame('hard')"><h3>Vaikea</h3><div class="dd">3 bottia<br>Ei aloitusbonusta<br>Tavalliset vahvistukset<br>Botit aggressiivisia</div></div>
+        <div class="diff-btn tut-btn" onclick="startTutorialLevel()"><h3>Harjoituskenttä</h3><div class="dd">Pieni kartta<br>Vain 1 helppo botti<br>Opastaa vuorosta vuoroon<br>Opi peli käytännössä!</div></div>
       </div>
       <button class="btn btn-t" onclick="startTut()" style="margin-top:12px;font-size:14px;padding:10px 24px">Lue ohjeet ensin</button>
     </div>
@@ -620,9 +624,9 @@ function updateUI(){
   document.getElementById('cur-player').textContent=PL[g.cur].name;
   document.getElementById('cur-player').style.color=PL[g.cur].m;
   const db=document.getElementById('diff-badge');
-  db.textContent=g.dc.label;
-  db.style.background=g.df==='easy'?'#22c55e':g.df==='medium'?'#f59e0b':'#ef4444';
-  db.style.color=g.df==='easy'?'#fff':g.df==='medium'?'#1e293b':'#fff';
+  db.textContent=tutLevel?'Harjoitus':g.dc.label;
+  db.style.background=tutLevel?'#8b5cf6':g.df==='easy'?'#22c55e':g.df==='medium'?'#f59e0b':'#ef4444';
+  db.style.color=tutLevel?'#fff':g.df==='easy'?'#fff':g.df==='medium'?'#1e293b':'#fff';
   document.getElementById('reinforce-count').textContent=g.reinf;
   const badge=document.getElementById('h-badge');
   const ht=document.getElementById('h-text');
@@ -640,6 +644,8 @@ function updateUI(){
   else if(g.phase===3)ht.innerHTML='<span class="ph">'+PL[g.cur].name+'</span> pelaa...';
   else if(g.phase===4)ht.innerHTML='<span class="ph">Peli päättynyt!</span>';
   else ht.textContent='';
+  // Tutorial level hints override
+  if(tutLevel&&g.cur===0)showTutLevelHint();
   for(let i=0;i<3;i++){const d=document.getElementById('pd'+i);d.className='pd';if(g.phase===i)d.classList.add('active');else if(g.phase>i||g.phase===3)d.classList.add('done')}
   document.getElementById('reinforce-info').style.display=(g.phase===0&&g.cur===0)?'block':'none';
   const pl=document.getElementById('players-list');pl.innerHTML='';
@@ -671,13 +677,13 @@ function updateUI(){
     mkBtn(act,PL[g.cur].name+' pelaa...','btn-s',null,true);
   }else{
     if(g.phase===0){
-      mkBtn(act,'Hyökkäysvaiheeseen ▶','btn-a',()=>{g.phase=1;g.sel=null;g.tgt=null;updateUI()},g.reinf>0);
-      mkBtn(act,'Ohita vahvistus ▶▶','btn-s',()=>{g.reinf=0;g.phase=1;g.sel=null;updateUI()},g.reinf===0);
+      mkBtn(act,'Hyökkäysvaiheeseen ▶','btn-a',()=>{g.phase=1;g.sel=null;g.tgt=null;if(tutLevel)advanceTutStep();updateUI()},g.reinf>0);
+      mkBtn(act,'Ohita vahvistus ▶▶','btn-s',()=>{g.reinf=0;g.phase=1;g.sel=null;if(tutLevel)advanceTutStep();updateUI()},g.reinf===0);
     }else if(g.phase===1){
-      mkBtn(act,'Linnoitukseen ▶','btn-f',()=>{g.phase=2;g.sel=null;g.tgt=null;g.fs=null;updateUI()});
+      mkBtn(act,'Linnoitukseen ▶','btn-f',()=>{g.phase=2;g.sel=null;g.tgt=null;g.fs=null;if(tutLevel)advanceTutStep();updateUI()});
     }else if(g.phase===2){
-      mkBtn(act,'Lopeta vuoro ▶','btn-e',()=>{g.endTurn();updateUI()});
-      mkBtn(act,'Ohita linnoitus ▶▶','btn-s',()=>{g.endTurn();updateUI()});
+      mkBtn(act,'Lopeta vuoro ▶','btn-e',()=>{g.endTurn();if(tutLevel)advanceTutStep();updateUI()});
+      mkBtn(act,'Ohita linnoitus ▶▶','btn-s',()=>{g.endTurn();if(tutLevel)advanceTutStep();updateUI()});
     }
   }
 }
@@ -688,7 +694,7 @@ function click(sx,sy){
   const g=G;if(g.phase===4||g.cur!==0||g.phase===3)return;
   const n=tAt(sx,sy);if(!n)return;const t=g.t[n];
   if(g.phase===0){
-    if(t.owner===0&&g.reinf>0){t.armies++;g.reinf--;updateUI()}
+    if(t.owner===0&&g.reinf>0){t.armies++;g.reinf--;if(tutLevel&&g.reinf===0)advanceTutStep();updateUI()}
   }else if(g.phase===1){
     if(!g.sel){if(t.owner===0&&t.armies>1){g.sel=n;updateUI()}}
     else if(!g.tgt){
@@ -716,8 +722,8 @@ function showDice(r){
   document.getElementById('dice-msg').textContent=r.conq?'Valloitettu! '+r.to+' on nyt sinun!':'Hyökkääjä menetti '+r.al+', puolustaja menetti '+r.dl;
   document.getElementById('dice-ok').onclick=()=>{dm.style.display='none';if(G.t[r.from]&&G.t[r.from].owner===G.cur&&G.t[r.from].armies>1)G.sel=r.from;else G.sel=null;G.tgt=null;updateUI()};
 }
-function startGame(diff){G=new Game(diff);soldiers=[];battleFx=[];document.getElementById('start-overlay').style.display='none';document.getElementById('dice-modal').style.display='none';updateUI()}
-function startNewGame(){document.getElementById('overlay').style.display='none';document.getElementById('dice-modal').style.display='none';document.getElementById('start-overlay').style.display='flex'}
+function startGame(diff){G=new Game(diff);soldiers=[];battleFx=[];tutLevel=false;document.getElementById('start-overlay').style.display='none';document.getElementById('dice-modal').style.display='none';updateUI()}
+function startNewGame(){document.getElementById('overlay').style.display='none';document.getElementById('dice-modal').style.display='none';tutLevel=false;document.getElementById('start-overlay').style.display='flex'}
 function openTutorial(){document.getElementById('overlay').style.display='none';startTut()}
 
 // ===================== TUTORIAL =====================
@@ -744,6 +750,66 @@ function showTutS(){
 document.getElementById('tut-next').addEventListener('click',()=>{if(tutS<TUT.length-1){tutS++;showTutS()}else closeTut()});
 document.getElementById('tut-prev').addEventListener('click',()=>{if(tutS>0){tutS--;showTutS()}});
 
+// ===================== TUTORIAL LEVEL =====================
+let tutLevel=false;
+let tutStepNum=0;
+
+const TUT_STEPS=[
+  {phase:0,msg:"VAHVISTUS-VAIHE: Klikkaa sinisiä alueita lisätäksesi armeijoita. Jokainen klikkaus lisää 1 armeijan. Vahvista raja-alueita — ne ovat lähimpänä vihollista!"},
+  {phase:0,msg:"Hyvä! Kun olet lisännyt kaikki armeijat, paina 'Hyökkäysvaiheeseen ▶' -nappia tai Space-näppäintä."},
+  {phase:1,msg:"HYÖKKÄYS-VAIHE: 1) Klikkaa omaa sinistä aluetta jossa on vähintään 2 armeijaa (se valitaan hyökkääjäksi). 2) Klikkaa viereistä punaista vihollisen aluetta."},
+  {phase:1,msg:"Näet nopat! Jos hyökkääjän noppa on suurempi, puolustaja menettää armeijan. Jos puolustajan armeijat loppuvat, valloitat alueen! Voit hyökätä uudelleen tai painaa 'Linnoitukseen ▶'."},
+  {phase:2,msg:"LINNOITUS-VAIHE (vapaaehtoinen): Voit siirtää armeijoita omien alueidesi välillä. Klikkaa lähdealuetta → klikkaa viereistä omaa kohdealuetta. Tai paina 'Ohita linnoitus ▶▶'."},
+  {phase:2,msg:"Hienoa! Olet oppinut perusteet. Jatka pelaamista — tavoitteena on valloittaa kaikki vihollisen alueet! Kun olet valmis, paina R = uusi peli eri vaikeustasolla."}
+];
+
+function startTutorialLevel(){
+  document.getElementById('start-overlay').style.display='none';
+  tutLevel=true;tutStepNum=0;
+  // Create small tutorial map: override TD temporarily
+  // We use a subset of territories for the tutorial
+  G=new Game('easy');
+  // Override: only use a few territories, give player big advantage
+  const tutTerrs=["Länsi-USA","Itä-USA","Keski-Amerikka","Kolumbia","Venezuela","Peru","Brasilia"];
+  const allNames=Object.keys(G.t);
+  for(const n of allNames){
+    if(!tutTerrs.includes(n)){G.t[n].owner=0;G.t[n].armies=1}
+  }
+  // Redistribute tutorial territories: player gets strong positions
+  G.t["Länsi-USA"].owner=0;G.t["Länsi-USA"].armies=6;
+  G.t["Itä-USA"].owner=0;G.t["Itä-USA"].armies=5;
+  G.t["Keski-Amerikka"].owner=0;G.t["Keski-Amerikka"].armies=4;
+  G.t["Kolumbia"].owner=1;G.t["Kolumbia"].armies=2;
+  G.t["Venezuela"].owner=1;G.t["Venezuela"].armies=1;
+  G.t["Peru"].owner=1;G.t["Peru"].armies=2;
+  G.t["Brasilia"].owner=1;G.t["Brasilia"].armies=3;
+  G.np=2;G.alive=new Set([0,1]);
+  G.reinf=8;G.phase=0;G.turn=1;G.sel=null;G.tgt=null;G.fs=null;
+  G.log=[];G._log("--- HARJOITUSKENTTÄ ---","turn");
+  G._log("Sinulla on 3 aluetta ja 8 vahvistusta. Vihollisella on 4 aluetta.","turn");
+  G._log("Seuraa ohjeita alareunassa!","turn");
+  soldiers=[];battleFx=[];
+  tutStepNum=0;
+  updateUI();
+}
+
+function showTutLevelHint(){
+  if(!tutLevel||tutStepNum>=TUT_STEPS.length)return;
+  const step=TUT_STEPS[tutStepNum];
+  if(G.phase===step.phase){
+    document.getElementById('h-text').innerHTML='<span class="ph">'+step.msg+'</span>';
+  }
+}
+
+function advanceTutStep(){
+  if(!tutLevel)return;
+  if(tutStepNum<TUT_STEPS.length-1){
+    const cur=TUT_STEPS[tutStepNum];
+    const next=TUT_STEPS[tutStepNum+1];
+    if(G.phase!==cur.phase||G.phase===next.phase)tutStepNum++;
+  }
+}
+
 // ===================== MAIN =====================
 function loop(){draw();requestAnimationFrame(loop)}
 function init(){
@@ -765,7 +831,7 @@ function init(){
   window.addEventListener('resize',()=>{resize();if(G)updateUI()});
   loop();
 }
-setInterval(()=>{if(G&&G.over){const ov=document.getElementById('overlay');if(ov.style.display!=='flex'){ov.style.display='flex';document.getElementById('go-text').textContent=PL[G.winner].name+' voittaa!';document.getElementById('go-text').style.color=PL[G.winner].m}}},200);
+setInterval(()=>{if(G&&G.over){const ov=document.getElementById('overlay');if(ov.style.display!=='flex'){ov.style.display='flex';const wn=G.winner===0?'Sinä voitit!':PL[G.winner].name+' voitti!';document.getElementById('go-text').textContent=wn;document.getElementById('go-text').style.color=PL[G.winner].m}}},200);
 window.onload=init;
 </script>
 </body>

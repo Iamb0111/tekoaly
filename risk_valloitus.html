@@ -28,6 +28,11 @@ canvas#map{display:block;width:100%;flex:1;cursor:pointer}
 #player-info .pn{font-size:15px;font-weight:bold}
 #diff-badge{font-size:11px;padding:2px 8px;border-radius:3px;margin-left:8px;font-weight:bold}
 #reinforce-info{padding:6px 14px;background:#1a2234;border-bottom:1px solid #1e293b;font-size:13px;display:none}
+#conquest-bar{padding:8px 14px;background:#1a2234;border-bottom:1px solid #1e293b}
+#conquest-bar .cb-title{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
+#conquest-bar .cb-big{font-size:22px;font-weight:bold;color:#3b82f6}
+#conquest-bar .cb-row{display:flex;height:10px;background:#1e293b;border-radius:5px;overflow:hidden;margin-top:4px}
+#conquest-bar .cb-seg{transition:width 0.3s}
 #players-panel{padding:8px 14px;border-bottom:1px solid #1e293b}
 #players-panel h3,.ph3{font-size:11px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px}
 .pbar{height:8px;background:#1e293b;border-radius:4px;margin:2px 0 4px;overflow:hidden}
@@ -121,6 +126,7 @@ canvas#map{display:block;width:100%;flex:1;cursor:pointer}
     <div id="scroll-area">
     <div id="player-info"><span class="pn" id="cur-player">Sinä</span><span id="diff-badge"></span></div>
     <div id="reinforce-info">Vahvistuksia: <span id="reinforce-count">0</span></div>
+    <div id="conquest-bar"><div class="cb-title">Valloitettu maailmaa</div><div class="cb-big" id="cb-pct">0%</div><div class="cb-row" id="cb-row"></div></div>
     <div id="players-panel"><h3>Pelaajat</h3><div id="players-list"></div></div>
     <div id="cont-panel"><h3>Mantereet</h3><div id="cont-list"></div></div>
     <div id="log-panel"><h3>Taisteluloki</h3><div id="log-entries"></div></div>
@@ -637,7 +643,7 @@ function updateUI(){
   if(g.phase===0&&g.cur===0)ht.innerHTML='Klikkaa <span class="ph">sinisiä</span> alueita lisätäksesi joukkoja (jäljellä: <span class="ph">'+g.reinf+'</span>)';
   else if(g.phase===1&&g.cur===0){
     if(!g.sel)ht.innerHTML='1) Klikkaa <span class="ph">omaa aluetta</span> (väh. 2 armeijaa) → 2) Klikkaa <span class="pc">vihollisen naapurialuetta</span>';
-    else ht.innerHTML='Hyökkääjä: <span class="ph">'+g.sel+'</span> ('+g.t[g.sel].armies+' armeijaa). Klikkaa <span class="pc">punaisella merkittyä</span> vihollista.';
+    else ht.innerHTML='Hyökkääjä: <span class="ph">'+g.sel+'</span> ('+g.t[g.sel].armies+' armeijaa). Klikkaa <span class="pc">katkoviivalla merkittyä</span> vihollisen naapurialuetta.';
   }
   else if(g.phase===2&&g.cur===0){
     if(!g.fs)ht.innerHTML='<span class="ph">LINNOITUS (vapaaehtoinen):</span> Siirrä armeijoita sisämaasta rajalle. Klikkaa <span class="ph">lähdealuetta</span> → <span class="pc">kohdealuetta</span>. Tai ohita.';
@@ -650,8 +656,23 @@ function updateUI(){
   if(tutLevel&&g.cur===0)showTutLevelHint();
   for(let i=0;i<3;i++){const d=document.getElementById('pd'+i);d.className='pd';if(g.phase===i)d.classList.add('active');else if(g.phase>i||g.phase===3)d.classList.add('done')}
   document.getElementById('reinforce-info').style.display=(g.phase===0&&g.cur===0)?'block':'none';
-  const pl=document.getElementById('players-list');pl.innerHTML='';
+  // Conquest percentage bar
   const total=Object.keys(g.t).length;
+  const myOw=Object.values(g.t).filter(t=>t.owner===0).length;
+  const myPct=Math.round(myOw/total*100);
+  document.getElementById('cb-pct').textContent=myPct+'%';
+  document.getElementById('cb-pct').style.color=PL[0].m;
+  const cbRow=document.getElementById('cb-row');cbRow.innerHTML='';
+  for(let i=0;i<g.np;i++){
+    const ow=Object.values(g.t).filter(t=>t.owner===i).length;
+    const pct=Math.round(ow/total*100);
+    if(pct>0){const seg=document.createElement('div');seg.className='cb-seg';seg.style.width=pct+'%';seg.style.background=PL[i].m;cbRow.appendChild(seg)}
+  }
+  // Unclaimed territory as dark
+  const unclaimed=total-myOw-Object.values(g.t).filter(t=>t.owner>0).length;
+  if(unclaimed>0){const seg=document.createElement('div');seg.className='cb-seg';seg.style.width=Math.round(unclaimed/total*100)+'%';seg.style.background='#1a2234';cbRow.appendChild(seg)}
+
+  const pl=document.getElementById('players-list');pl.innerHTML='';
   for(let i=0;i<g.np;i++){
     const ow=Object.values(g.t).filter(t=>t.owner===i).length;
     const pct=Math.round(ow/total*100);

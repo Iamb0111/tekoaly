@@ -293,13 +293,56 @@ class Game{
   }
   _runAI(){
     const p=this.cur;this._calcR();
-    this._log("--- "+PL[p].name+" vuoro ---","turn");
-    this._aiR(p);
-    const atks=this._aiA(p);
-    this._aiF(p);
-    this.aiT=setTimeout(()=>{this._chkWin();this.endTurn();updateUI()},500+atks*180);
+    this._log("--- "+PL[p].name+" miettii... ---","turn");
+    this.aiStep=0;this.aiPlayer=p;
+    this.aiQueue=[];
+    // Build queue of actions
+    const rActions=this._aiRQueue(p);
+    const aActions=this._aiAQueue(p);
+    const fActions=this._aiFQueue(p);
+    this.aiQueue=[...rActions,...aActions,...fActions];
+    this._aiNext();
   }
-  _aiR(p){
+  _aiNext(){
+    if(!this.aiQueue.length){
+      this.aiT=setTimeout(()=>{this._chkWin();this.endTurn();updateUI()},400);
+      return;
+    }
+    const action=this.aiQueue.shift();
+    const delay=action.type==='reinforce'?300:action.type==='attack'?700:400;
+    this.aiT=setTimeout(()=>{
+      if(action.type==='reinforce'){
+        this.t[action.terr].armies++;
+        this._log(PL[this.aiPlayer].name+" vahvistaa "+action.terr,"reinf");
+      }else if(action.type==='attack'){
+        this._doAtk(action.from,action.to,action.dice);
+        this._chkWin();
+      }else if(action.type==='fortify'){
+        const src=this.t[action.from];const dst=this.t[action.to];
+        const mv=src.armies-1;dst.armies+=mv;src.armies=1;
+        this._log(PL[this.aiPlayer].name+" linnoittaa "+action.from+" → "+action.to,"fort");
+      }
+      updateUI();
+      this._aiNext();
+    },delay);
+  }
+  _aiAg(pool){
+    let best=null,bestS=-1;
+    for(const n of pool){const en=TD[n].nb.filter(nb=>this.t[nb].owner!==this.cur).length;if(en>bestS){bestS=en;best=n}}
+    return best;
+  }
+  _aiDf(pool){
+    let best=null,bestTh=-1;
+    for(const n of pool){const th=TD[n].nb.filter(nb=>this.t[nb].owner!==this.cur).reduce((s,nb)=>s+this.t[nb].armies,0);if(th>bestTh){bestTh=th;best=n}}
+    return best;
+  }
+  _aiBl(pool){
+    let best=null,bestS=-1;
+    for(const n of pool){const en=TD[n].nb.filter(nb=>this.t[nb].owner!==this.cur).length;const th=TD[n].nb.filter(nb=>this.t[nb].owner!==this.cur).reduce((s,nb)=>s+this.t[nb].armies,0);const s=en*2-th*0.3;if(s>bestS){bestS=s;best=n}}
+    return best;
+  }
+  _aiRQueue(p){
+    const queue=[];
     const ow=Object.keys(this.t).filter(n=>this.t[n].owner===p);
     const bd=ow.filter(n=>TD[n].nb.some(nb=>this.t[nb].owner!==p));
     const pool=bd.length?bd:ow;
@@ -307,14 +350,30 @@ class Game{
       let n;
       if(p===1)n=this._aiAg(pool);else if(p===2)n=this._aiDf(pool);else n=this._aiBl(pool);
       if(!n)n=pool[Math.floor(Math.random()*pool.length)];
-      this.t[n].armies++;this.reinf--;
+      queue.push({type:'reinforce',terr:n});
+      this.reinf--;
+    }
+    return queue;
+  }
+  _simAtk(from,to,num){
+    const atk=this.t[from],def=this.t[to];
+    const ad=this._roll(Math.min(num,atk.armies-1));
+    const dd=this._roll(Math.min(2,def.armies));
+    let al=0,dl=0;
+    for(let i=0;i<Math.min(ad.length,dd.length);i++){if(ad[i]>dd[i])dl++;else al++}
+    atk.armies-=al;def.armies-=dl;
+    if(def.armies<=0){
+      const old=def.owner;def.owner=atk.owner;
+      const mv=Math.max(num,atk.armies-1);
+      def.armies=Math.max(1,Math.min(mv,atk.armies-1));
+      atk.armies-=def.armies;
+      if(!Object.values(this.t).map(t=>t.owner).includes(old))this.alive.delete(old);
     }
   }
-  _aiAg(pool){let b=null,bs=-999;for(const n of pool){const en=TD[n].nb.filter(nb=>this.t[nb].owner!==this.t[n].owner);if(!en.length)continue;const wk=en.reduce((a,b)=>this.t[a].armies<this.t[b].armies?a:b);const s=this.t[n].armies-this.t[wk].armies+en.length*3;if(s>bs){bs=s;b=n}}return b}
-  _aiDf(pool){let b=null,bt=0;for(const n of pool){const th=TD[n].nb.filter(nb=>this.t[nb].owner!==this.t[n].owner).reduce((s,nb)=>s+this.t[nb].armies,0);const nd=th-this.t[n].armies*2;if(nd>bt){bt=nd;b=n}}return b}
-  _aiBl(pool){let b=null,bs=-999;for(const n of pool){const en=TD[n].nb.filter(nb=>this.t[nb].owner!==this.t[n].owner);if(!en.length)continue;const th=en.reduce((s,nb)=>s+this.t[nb].armies,0);const s=en.length*3+(th>this.t[n].armies*2?8:0)-this.t[n].armies;if(s>bs){bs=s;b=n}}return b}
-  _aiA(p){
-    let cnt=0;
+  _aiAQueue(p){
+    const savedT={};for(const n in this.t)savedT[n]={owner:this.t[n].owner,armies:this.t[n].armies};
+    const savedAlive=new Set(this.alive);
+    const queue=[];
     for(let it=0;it<this.dc.botMaxAtks;it++){
       const ak=Object.keys(this.t).filter(n=>this.t[n].owner===p&&this.t[n].armies>1).map(n=>({n,t:TD[n].nb.filter(nb=>this.t[nb].owner!==p).map(nb=>({nb,s:this.t[n].armies-this.t[nb].armies}))})).filter(x=>x.t.length);
       if(!ak.length)break;
@@ -327,14 +386,19 @@ class Game{
       else ch=all[0].s>=0?all[0]:(Math.random()>0.4?null:all[0]);
       if(!ch)break;
       const nd=Math.min(3,this.t[ch.f].armies-1);if(nd<1)break;
-      this._doAtk(ch.f,ch.to,nd);cnt++;
-      if(this._chkWin())return cnt;
+      queue.push({type:'attack',from:ch.f,to:ch.to,dice:nd});
+      this._simAtk(ch.f,ch.to,nd);
+      if(Object.values(this.t).every(t=>t.owner===p))break;
     }
-    return cnt;
+    for(const n in savedT){this.t[n].owner=savedT[n].owner;this.t[n].armies=savedT[n].armies}
+    this.alive=savedAlive;
+    return queue;
   }
-  _aiF(p){
+  _aiFQueue(p){
+    const queue=[];
     const ow=Object.keys(this.t).filter(n=>this.t[n].owner===p);
-    for(const n of ow){const t=this.t[n];if(t.armies<=1)continue;if(TD[n].nb.some(nb=>this.t[nb].owner!==p))continue;for(const nb of TD[n].nb){if(this.t[nb].owner===p&&TD[nb].nb.some(nnb=>this.t[nnb].owner!==p)){const mv=t.armies-1;this.t[nb].armies+=mv;t.armies=1;break}}}
+    for(const n of ow){const t=this.t[n];if(t.armies<=1)continue;if(TD[n].nb.some(nb=>this.t[nb].owner!==p))continue;for(const nb of TD[n].nb){if(this.t[nb].owner===p&&TD[nb].nb.some(nnb=>this.t[nnb].owner!==p)){queue.push({type:'fortify',from:n,to:nb});break}}}
+    return queue;
   }
 }
 
